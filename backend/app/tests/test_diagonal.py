@@ -39,3 +39,18 @@ def test_diagonal_module_rejects_nonpositive():
         diagonal_count(6.0, 4.5, 0.6, 0.6, 8.0, 0.0)
     with pytest.raises(ValueError):
         diagonal_count(6.0, 4.5, 0.6, 0.6, 8.0, -0.2)
+
+
+def test_diagonal_columns_never_below_straight():
+    # 即便系数小于 1（合法但算不出加量），斜铺列也不得低于正铺同列
+    r = tile_count(6.0, 4.5, 0.6, 0.6, 8.0, diagonal=True, diag_factor=0.5)
+    assert r["diag_factor"] == 0.5
+    assert r["diag_raw_count"] == r["raw_count"] == 75
+    assert r["diag_order_count"] == r["order_count"] == 81
+
+
+def test_diagonal_columns_ge_straight_across_factors():
+    for f in (0.9, 1.0, 1.05, 1.1, 1.5, 2.0):
+        r = tile_count(6.0, 4.5, 0.6, 0.6, 8.0, diagonal=True, diag_factor=f)
+        assert r["diag_raw_count"] >= r["raw_count"], f
+        assert r["diag_order_count"] >= r["order_count"], f

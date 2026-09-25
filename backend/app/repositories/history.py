@@ -47,13 +47,10 @@ def list_runs(limit: int = 50):
             """,
             (limit,),
         ).fetchall()
-        from app.services.diagonal_persist import list_summary_view
-
         out = []
         for row in rows:
             d = dict(row)
-            raw = json.loads(d.pop("result_json"))
-            d["result"] = list_summary_view(raw)
+            d["result"] = json.loads(d.pop("result_json"))
             out.append(d)
         return out
     finally:
@@ -75,10 +72,8 @@ def get_run(run_id: int):
         ).fetchone()
         if not row:
             return None
-        from app.services.diagonal_persist import open_detail_view
-
         d = dict(row)
-        d["result"] = open_detail_view(json.loads(d.pop("result_json")))
+        d["result"] = json.loads(d.pop("result_json"))
         return d
     finally:
         conn.close()

@@ -114,3 +114,65 @@ def test_set_diag_factor_rejects_invalid(client):
     assert client.put("/api/settings/diag-factor", json={"diag_factor": 9}).status_code == 422
     # 默认系数未被污染
     assert client.get("/api/settings").json()["diag_factor"] != "0"
+
+
+def test_saved_diagonal_response_detail_list_share_same_columns(client):
+    cols = (
+        "diagonal",
+        "diag_factor",
+        "raw_count",
+        "order_count",
+        "diag_raw_count",
+        "diag_order_count",
+    )
+    saved = client.post(
+        "/api/estimate",
+        json={
+            "room_id": 1,
+            "tile_id": 1,
+            "save": True,
+            "diagonal": True,
+            "diag_factor": 1.15,
+        },
+    ).json()
+
+    detail = client.get(f"/api/runs/{saved['run_id']}").json()["result"]
+    listed = next(
+        r["result"]
+        for r in client.get("/api/runs").json()["items"]
+        if r["id"] == saved["run_id"]
+    )
+
+    for c in cols:
+        assert detail[c] == saved[c], f"detail {c} 与落库前回包不一致"
+        assert listed[c] == saved[c], f"list {c} 与落库前回包不一致"
+    # 不得残留折叠用的侧键
+    for view in (detail, listed):
+        assert "list_diag_order_count" not in view
+        assert "list_diag_raw_count" not in view
+    # 斜铺加量不得被吞进正铺：两列分列且斜铺不小于正铺
+    assert detail["order_count"] == 81
+    assert detail["diag_order_count"] == 94
+    assert detail["diag_order_count"] >= detail["order_count"]
+
+
+def test_saved_straight_run_keeps_diagonal_columns_null(client):
+    saved = client.post(
+        "/api/estimate",
+        json={"room_id": 1, "tile_id": 1, "save": True},
+    ).json()
+    assert saved["diagonal"] is False
+    assert saved["diag_order_count"] is None
+
+    detail = client.get(f"/api/runs/{saved['run_id']}").json()["result"]
+    listed = next(
+        r["result"]
+        for r in client.get("/api/runs").json()["items"]
+        if r["id"] == saved["run_id"]
+    )
+    for view in (detail, listed):
+        assert view["diagonal"] is False
+        assert view["diag_factor"] is None
+        assert view["diag_raw_count"] is None
+        assert view["diag_order_count"] is None
+        assert view["order_count"] == 81  # 与改造前同参一致

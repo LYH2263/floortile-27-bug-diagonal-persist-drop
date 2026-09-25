@@ -42,9 +42,13 @@ def tile_count(
     if diagonal:
         if diag_factor is None:
             raise ValueError("diag_factor required when diagonal enabled")
-        result.update(
-            diagonal_count(room_l, room_w, tile_l, tile_w, waste_pct, diag_factor)
-        )
+        diag = diagonal_count(room_l, room_w, tile_l, tile_w, waste_pct, diag_factor)
+        # 业务不变量：斜铺净用量/订货片数不得小于正铺同列。
+        # 系数虽允许 (0, 上限]，但小于 1 的系数算出的斜铺量在业务上不成立，
+        # 这里抬到正铺基线（不改变系数非法时的 422 拒绝）。
+        diag["diag_raw_count"] = max(diag["diag_raw_count"], raw)
+        diag["diag_order_count"] = max(diag["diag_order_count"], with_waste)
+        result.update(diag)
     return result
 
 

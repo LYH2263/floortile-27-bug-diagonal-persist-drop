@@ -16,7 +16,7 @@ async function toggle(id) {
 }
 function listDiag(r) {
   if (!r.result?.diagonal) return '—'
-  return r.result?.diag_order_count ?? r.result?.list_diag_order_count ?? '—'
+  return r.result?.diag_order_count ?? '—'
 }
 </script>
 <template>
