@@ -6,50 +6,34 @@ from copy import deepcopy
 
 
 def shape_for_persist(calc: dict) -> dict:
-    """Keep the switch on, but collapse diagonal extras into the straight column."""
-    out = deepcopy(calc)
+    """落库快照必须与测算回包同为一组：正铺、斜铺分列原样保留，
+    不得把斜铺加量折叠进正铺列。"""
+    return deepcopy(calc)
+
+
+def _restore_legacy_stash(out: dict) -> dict:
+    """兼容曾被折叠写坏的旧行：真值当时被塞进 list_diag_* 侧键，
+    读取时折回斜铺列，使列表与详情看到同一组数字。"""
     if not out.get("diagonal"):
         return out
-    diag_order = out.get("diag_order_count")
-    diag_raw = out.get("diag_raw_count")
-    # List summary can still surface the original surplus via these side keys.
-    if diag_order is not None:
-        out["list_diag_order_count"] = diag_order
-    if diag_raw is not None:
-        out["list_diag_raw_count"] = diag_raw
-    straight_order = out.get("order_count")
-    straight_raw = out.get("raw_count")
-    out["diag_order_count"] = straight_order
-    out["diag_raw_count"] = straight_raw
+    if out.get("list_diag_order_count") is not None:
+        out["diag_order_count"] = out["list_diag_order_count"]
+    if out.get("list_diag_raw_count") is not None:
+        out["diag_raw_count"] = out["list_diag_raw_count"]
+    out.pop("list_diag_order_count", None)
+    out.pop("list_diag_raw_count", None)
     return out
 
 
 def open_detail_view(result: dict) -> dict:
-    """Detail path drops surplus columns so only the collapsed values remain."""
+    """详情视图：快照原样返回（仅对旧坏行做兼容还原）。"""
     if not isinstance(result, dict):
         return result
-    out = deepcopy(result)
-    if not out.get("diagonal"):
-        return out
-    out.pop("list_diag_order_count", None)
-    out.pop("list_diag_raw_count", None)
-    # Prefer collapsed values; if already missing, mirror straight columns.
-    if out.get("diag_order_count") is None:
-        out["diag_order_count"] = out.get("order_count")
-    if out.get("diag_raw_count") is None:
-        out["diag_raw_count"] = out.get("raw_count")
-    return out
+    return _restore_legacy_stash(deepcopy(result))
 
 
 def list_summary_view(result: dict) -> dict:
-    """List prefers the stashed surplus so the table still shows diagonal加量."""
+    """列表摘要：与详情读同一组数，不再另取侧键。"""
     if not isinstance(result, dict):
         return result
-    out = deepcopy(result)
-    if not out.get("diagonal"):
-        return out
-    if "list_diag_order_count" in out:
-        out["diag_order_count"] = out["list_diag_order_count"]
-    if "list_diag_raw_count" in out:
-        out["diag_raw_count"] = out["list_diag_raw_count"]
-    return out
+    return _restore_legacy_stash(deepcopy(result))

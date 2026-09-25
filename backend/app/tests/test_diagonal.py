@@ -39,3 +39,51 @@ def test_diagonal_module_rejects_nonpositive():
         diagonal_count(6.0, 4.5, 0.6, 0.6, 8.0, 0.0)
     with pytest.raises(ValueError):
         diagonal_count(6.0, 4.5, 0.6, 0.6, 8.0, -0.2)
+
+
+def test_diagonal_never_below_straight_when_factor_under_one():
+    # 系数 <1：斜铺净用量/订货片数以正铺为下限
+    r = tile_count(6.0, 4.5, 0.6, 0.6, 8.0, diagonal=True, diag_factor=0.8)
+    assert r["diag_raw_count"] == r["raw_count"] == 75
+    assert r["diag_order_count"] == r["order_count"] == 81
+
+
+def test_shape_for_persist_keeps_snapshot_verbatim():
+    from app.services.diagonal_persist import shape_for_persist
+
+    calc = tile_count(6.0, 4.5, 0.6, 0.6, 8.0, diagonal=True, diag_factor=1.15)
+    shaped = shape_for_persist(calc)
+    # 落库快照与测算回包同一组：斜铺加量不得折叠进正铺列
+    assert shaped == calc
+    assert shaped["diag_raw_count"] == 87
+    assert shaped["diag_order_count"] == 94
+    assert shaped["order_count"] == 81
+    assert "list_diag_order_count" not in shaped
+    assert "list_diag_raw_count" not in shaped
+
+
+def test_read_views_restore_legacy_collapsed_rows():
+    from app.services.diagonal_persist import list_summary_view, open_detail_view
+
+    # 旧 bug 写坏的行：斜铺列被压成正铺值，真值藏在 list_diag_* 侧键
+    legacy = {
+        "diagonal": True,
+        "diag_factor": 1.15,
+        "raw_count": 75,
+        "order_count": 81,
+        "diag_raw_count": 75,
+        "diag_order_count": 81,
+        "list_diag_raw_count": 87,
+        "list_diag_order_count": 94,
+    }
+    for view in (open_detail_view, list_summary_view):
+        out = view(legacy)
+        assert out["diag_raw_count"] == 87
+        assert out["diag_order_count"] == 94
+        assert out["order_count"] == 81
+        assert "list_diag_raw_count" not in out
+        assert "list_diag_order_count" not in out
+    # 两个视图读同一组数
+    assert open_detail_view(legacy)["diag_order_count"] == list_summary_view(legacy)[
+        "diag_order_count"
+    ]

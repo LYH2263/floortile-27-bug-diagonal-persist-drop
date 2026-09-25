@@ -114,3 +114,46 @@ def test_set_diag_factor_rejects_invalid(client):
     assert client.put("/api/settings/diag-factor", json={"diag_factor": 9}).status_code == 422
     # 默认系数未被污染
     assert client.get("/api/settings").json()["diag_factor"] != "0"
+
+
+def test_saved_run_list_and_detail_show_same_diagonal_columns(client):
+    # 落库：斜铺 1.15
+    saved = client.post(
+        "/api/estimate",
+        json={
+            "room_id": 1,
+            "tile_id": 1,
+            "save": True,
+            "diagonal": True,
+            "diag_factor": 1.15,
+        },
+    ).json()
+    run_id = saved["run_id"]
+
+    detail = client.get(f"/api/runs/{run_id}").json()["result"]
+    # 详情：正铺、斜铺分列与落库前回包同一组，加量不得被吞
+    assert detail["diagonal"] is True
+    assert detail["order_count"] == saved["order_count"] == 81
+    assert detail["raw_count"] == saved["raw_count"] == 75
+    assert detail["diag_order_count"] == saved["diag_order_count"] == 94
+    assert detail["diag_raw_count"] == saved["diag_raw_count"] == 87
+    assert detail["diag_factor"] == saved["diag_factor"] == 1.15
+
+    # 列表摘要：与详情同一组斜铺数字
+    items = client.get("/api/runs").json()["items"]
+    row = next(i for i in items if i["id"] == run_id)["result"]
+    assert row["diagonal"] is True
+    assert row["order_count"] == 81
+    assert row["diag_order_count"] == 94
+    assert row["diag_raw_count"] == 87
+
+
+def test_diagonal_never_below_straight(client):
+    # 系数 <1 时斜铺一侧仍不得小于正铺
+    r = client.get(
+        "/api/estimate",
+        params={"room_id": 1, "tile_id": 1, "diagonal": "true", "diag_factor": 0.8},
+    ).json()
+    assert r["diagonal"] is True
+    assert r["diag_raw_count"] >= r["raw_count"]
+    assert r["diag_order_count"] >= r["order_count"]

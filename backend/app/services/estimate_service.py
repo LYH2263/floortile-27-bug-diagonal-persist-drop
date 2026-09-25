@@ -35,7 +35,7 @@ def run_estimate(
     if save:
         from app.services.diagonal_persist import shape_for_persist
 
-        # Preview keeps full calc; only the stored snapshot is reshaped.
+        # 落库快照与本次回包同一组：正铺、斜铺分列都原样保留。
         payload = {**shape_for_persist(calc), "room_id": room_id, "tile_id": tile_id}
         run_id = history.insert_run(room_id, tile_id, waste, payload, note)
 

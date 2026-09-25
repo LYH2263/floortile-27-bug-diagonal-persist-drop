@@ -45,6 +45,9 @@ def tile_count(
         result.update(
             diagonal_count(room_l, room_w, tile_l, tile_w, waste_pct, diag_factor)
         )
+        # 业务不变量：斜铺一侧不小于正铺（系数 <1 时以正铺为下限兜底）
+        result["diag_raw_count"] = max(result["diag_raw_count"], raw)
+        result["diag_order_count"] = max(result["diag_order_count"], with_waste)
     return result
 
 
